@@ -1,0 +1,1 @@
+SELECT * FROM surgeries_database.intervencoes_cirurgicas_cleaned_en;inscritos_cleaned_en
