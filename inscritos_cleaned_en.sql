@@ -1,0 +1,1 @@
+inscritos_cleaned_enSELECT * FROM surgeries_database.inscritos_cleaned_en;
