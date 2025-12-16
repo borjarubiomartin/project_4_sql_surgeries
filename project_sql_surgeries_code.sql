@@ -263,17 +263,125 @@ FROM health_data d
 INNER JOIN hospitals h
     ON d.id_health_centre = h.id_health_centre;
 
--- UDE PEARSON R STATISTIC TO ASSESS CORRELATION BETWEEN: pct_over_max_waiting_time   dep var 
+-- USE PEARSON R STATISTIC TO ASSESS CORRELATION BETWEEN: pct_over_max_waiting_time   dep var 
 -- and  scheduled_surgeries indep var
 SELECT
-    (SUM(d.scheduled_surgeries * d.pct_over_max_waiting_time) 
-     - SUM(d.scheduled_surgeries) * SUM(d.pct_over_max_waiting_time) / COUNT(*))
-    /
-    SQRT(
-        (SUM(POW(d.scheduled_surgeries,2)) - POW(SUM(d.scheduled_surgeries),2)/COUNT(*))
-        *
-        (SUM(POW(d.pct_over_max_waiting_time,2)) - POW(SUM(d.pct_over_max_waiting_time),2)/COUNT(*))
-    ) AS pearson_correlation
+    ROUND(
+        (
+            (COUNT(*) * SUM(scheduled_surgeries * pct_over_max_waiting_time)) -
+            (SUM(scheduled_surgeries) * SUM(pct_over_max_waiting_time))
+        ) /
+        SQRT(
+            (COUNT(*) * SUM(scheduled_surgeries * scheduled_surgeries) -
+             SUM(scheduled_surgeries) * SUM(scheduled_surgeries))
+            *
+            (COUNT(*) * SUM(pct_over_max_waiting_time * pct_over_max_waiting_time) -
+             SUM(pct_over_max_waiting_time) * SUM(pct_over_max_waiting_time))
+        )
+    , 2) AS pearson_r
+FROM health_data;
+
+  
+  -- using over_max_waiting_time as dep var (not used in the final scatter plot visualization for ppt)
+-- 
+SELECT
+    ROUND(
+        (
+            (COUNT(*) * SUM(scheduled_surgeries * over_max_waiting_time)) -
+            (SUM(scheduled_surgeries) * SUM(over_max_waiting_time))
+        ) /
+        SQRT(
+            (COUNT(*) * SUM(scheduled_surgeries * scheduled_surgeries) -
+             SUM(scheduled_surgeries) * SUM(scheduled_surgeries))
+            *
+            (COUNT(*) * SUM(over_max_waiting_time * over_max_waiting_time) -
+             SUM(over_max_waiting_time) * SUM(over_max_waiting_time))
+        )
+    , 2) AS pearson_r
+FROM health_data;
+
+SET SQL_SAFE_UPDATES = 0;
+ALTER TABLE health_data
+ADD COLUMN health_centre_performance VARCHAR(20);
+UPDATE health_data
+SET health_centre_performance =
+    CASE
+        WHEN pct_over_max_waiting_time <= 20 THEN 'EXITOSO (<= 20)'
+        WHEN pct_over_max_waiting_time > 20 AND pct_over_max_waiting_time < 40 THEN 'ACEPTABLE (< 40)'
+        WHEN pct_over_max_waiting_time >= 40 AND pct_over_max_waiting_time < 60 THEN 'ATENCION (< 60)'
+        WHEN pct_over_max_waiting_time >= 60 AND pct_over_max_waiting_time < 80 THEN 'CRITICO (< 80)'
+        WHEN pct_over_max_waiting_time >= 80 THEN 'SOS (>= 80)'
+        ELSE NULL
+    END
+    WHERE pct_over_max_waiting_time IS NOT NULL;
+SET SQL_SAFE_UPDATES = 1;
+
+-- This view uses the year average of pct_over_max_waiting_time for each health centre
+CREATE VIEW health_centre_performance2 AS
+SELECT 
+    d.year,
+    h.health_centre,
+    AVG(d.pct_over_max_waiting_time) AS avg_pct_over_max_waiting_time,
+    CASE
+        WHEN AVG(d.pct_over_max_waiting_time) <= 20 THEN 'EXITOSO (<= 20)'
+        WHEN AVG(d.pct_over_max_waiting_time) > 20 AND AVG(d.pct_over_max_waiting_time) < 40 THEN 'ACEPTABLE (< 40)'
+        WHEN AVG(d.pct_over_max_waiting_time) >= 40 AND AVG(d.pct_over_max_waiting_time) < 60 THEN 'ATENCION (< 60)'
+        WHEN AVG(d.pct_over_max_waiting_time) >= 60 AND AVG(d.pct_over_max_waiting_time) < 80 THEN 'CRITICO (< 80)'
+        WHEN AVG(d.pct_over_max_waiting_time) >= 80 THEN 'SOS (>= 80)'
+        ELSE NULL
+    END AS performance
 FROM health_data d
-WHERE d.scheduled_surgeries IS NOT NULL
-  AND d.pct_over_max_waiting_time IS NOT NULL;
+INNER JOIN hospitals h 
+    ON d.id_health_centre = h.id_health_centre
+WHERE d.pct_over_max_waiting_time IS NOT NULL
+GROUP BY h.health_centre, d.year
+ORDER BY avg_pct_over_max_waiting_time DESC;
+
+
+
+CREATE VIEW health_centre_performance3 AS
+SELECT 
+    d.year,
+    d.id_health_centre,
+    h.health_centre,
+    d.pct_over_max_waiting_time,
+    CASE
+        WHEN d.pct_over_max_waiting_time <= 20 THEN 'EXITOSO (<= 20)'
+        WHEN d.pct_over_max_waiting_time > 20 AND d.pct_over_max_waiting_time < 40 THEN 'ACEPTABLE (< 40)'
+        WHEN d.pct_over_max_waiting_time >= 40 AND d.pct_over_max_waiting_time < 60 THEN 'ATENCION (< 60)'
+        WHEN d.pct_over_max_waiting_time >= 60 AND d.pct_over_max_waiting_time < 80 THEN 'CRITICO (< 80)'
+        WHEN d.pct_over_max_waiting_time >= 80 THEN 'SOS (>= 80)'
+        ELSE NULL
+    END AS performance_dec2024
+FROM health_data d
+INNER JOIN hospitals h 
+    ON d.id_health_centre = h.id_health_centre
+WHERE d.year = 2024
+	AND d.month = 12
+	AND d.scheduled_surgeries IS NOT NULL
+	AND d.pct_over_max_waiting_time IS NOT NULL
+ORDER BY pct_over_max_waiting_time DESC;
+
+-- Categories of performance: 'EXITOSO (<= 20)'; > 20 AND < 40 'ACEPTABLE' ; >= 40 AND < 60 : 'ATENCION' ; >= 60 AND < 80 : 'CRITICO ; >= 80 : 'SOS'
+CREATE VIEW health_centre_performance4 AS
+SELECT 
+    d.year,
+    d.month,
+    d.id_health_centre,
+    h.health_centre,
+    d.pct_over_max_waiting_time,
+    CASE
+        WHEN d.pct_over_max_waiting_time <= 20 THEN 'EXITOSO'
+        WHEN d.pct_over_max_waiting_time > 20 AND d.pct_over_max_waiting_time < 40 THEN 'ACEPTABLE'
+        WHEN d.pct_over_max_waiting_time >= 40 AND d.pct_over_max_waiting_time < 60 THEN 'ATENCION'
+        WHEN d.pct_over_max_waiting_time >= 60 AND d.pct_over_max_waiting_time < 80 THEN 'CRITICO'
+        WHEN d.pct_over_max_waiting_time >= 80 THEN 'SOS'
+        ELSE NULL
+    END AS performance_dec2024_2018
+FROM health_data d
+INNER JOIN hospitals h 
+    ON d.id_health_centre = h.id_health_centre
+WHERE d.month = 12
+	AND d.scheduled_surgeries IS NOT NULL
+	AND d.pct_over_max_waiting_time IS NOT NULL
+ORDER BY d.year, d.id_health_centre, pct_over_max_waiting_time DESC;
