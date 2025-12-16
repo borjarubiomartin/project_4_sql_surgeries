@@ -1,0 +1,210 @@
+# Projects SQL Surgeries
+
+## 📌 Descripción del proyecto
+
+Este proyecto analiza el **desempeño quirúrgico del Sistema Nacional de Salud (SNS) de Portugal** durante el período **2018–2025**, utilizando **SQL (MySQL)** como herramienta principal de integración, limpieza, modelado y análisis de datos.
+
+El objetivo central es evaluar si el aumento del número de cirugías realizadas se asocia con una reducción en los **tiempos de espera quirúrgicos**, especialmente en relación con el cumplimiento de los **Tiempos Máximos de Respuesta Garantizados (TMRG)**.
+
+El proyecto forma parte del **Mini Project – SQL: From Data to Insight**.
+
+---
+
+## 🎯 Objetivos
+
+* Estandarizar y limpiar datos de intervenciones quirúrgicas y listas de espera.
+* Diseñar un **modelo relacional (ERD)** eficiente a partir de dataframes originales.
+* Integrar múltiples fuentes de datos en una base de datos SQL.
+* Analizar el desempeño hospitalario por centro y región.
+* Evaluar la relación entre volumen de cirugías y tiempos de espera.
+* Generar vistas y métricas clave para análisis exploratorio y presentación.
+
+---
+
+## 📊 Hipótesis
+
+* **H0**: Si se realizan más cirugías, se trata a más pacientes y la lista y el tiempo de espera disminuyen.
+* **H1**: Si se realizan más cirugías, se trata a más pacientes pero la lista y el tiempo de espera no disminuyen (o aumentan), debido a un incremento simultáneo de la demanda.
+
+---
+
+## 🗂️ Fuentes de datos
+
+Los datos provienen del **Portal de Transparencia del SNS de Portugal**, obtenidos vía API:
+
+1. **Intervenciones quirúrgicas**
+
+   * Dataset: `intervencoes_cirurgicas_cleaned_en`
+   * Información mensual por hospital sobre cirugías realizadas.
+
+2. **Pacientes en lista de espera (SIGLIC)**
+
+   * Dataset: `inscritos_cleaned_en`
+   * Información sobre pacientes inscritos y tiempos de espera.
+
+---
+
+## 🧹 Limpieza y estandarización de datos
+
+### Normalización de centros hospitalarios
+
+Se detectaron **duplicados e inconsistencias en los nombres de hospitales** (por ejemplo, EPE vs PPP, errores de codificación de caracteres).
+
+Acciones realizadas:
+
+* Identificación de valores duplicados en `health_centre`.
+* Estandarización mediante `UPDATE ... CASE WHEN`.
+* Unificación de hospitales con múltiples denominaciones.
+
+Resultado:
+
+* **78 centros hospitalarios únicos** tras la estandarización.
+
+---
+
+## 🏗️ Modelo de datos
+
+### Base de datos
+
+```sql
+CREATE DATABASE surgeries_database;
+```
+
+### Tablas principales
+
+#### `hospitals`
+
+Contiene información estática de los centros de salud.
+
+* `id_health_centre` (PK)
+* `health_centre`
+* `region`
+
+#### `health_data`
+
+Contiene información mensual por hospital.
+
+* Año y mes
+* Cirugías (convencionales, ambulatorias, urgentes, programadas)
+* Pacientes en lista de espera
+* Indicadores de tiempos de espera
+
+Relación:
+
+* `health_data.id_health_centre` → `hospitals.id_health_centre`
+
+---
+
+## 🔗 Integración de datos
+
+Los datos se integran mediante:
+
+* Join por **hospital, año y mes** entre intervenciones y listas de espera.
+* Inserción normalizada en las tablas finales.
+
+Resultados:
+
+* **3.098 observaciones finales** en `health_data`.
+
+---
+
+## 📈 Análisis exploratorio (EDA)
+
+### Distribución de hospitales por región
+
+* Cálculo del número y porcentaje de hospitales por región.
+* Creación de la vista:
+
+```sql
+CREATE VIEW num_health_centres AS ...
+```
+
+### Actividad quirúrgica
+
+* Cálculo de:
+
+  * Total de cirugías por hospital.
+  * Distribución porcentual por tipo:
+
+    * Convencional
+    * Ambulatoria
+    * Urgente
+
+---
+
+## ⏱️ Indicadores de tiempos de espera
+
+### Variables derivadas
+
+Se crean nuevas métricas clave:
+
+* `over_max_waiting_time`
+  Pacientes que superan el tiempo máximo garantizado.
+
+* `pct_over_max_waiting_time`
+  Porcentaje de pacientes fuera de plazo.
+
+Estas métricas permiten evaluar el desempeño hospitalario de forma homogénea.
+
+---
+
+## 👁️ Vistas SQL
+
+* `num_health_centres`
+  Resumen de hospitales por región.
+
+* `health_data_general`
+  Vista integrada con indicadores de espera y hospitales.
+
+Estas vistas se utilizan directamente en la presentación y visualizaciones.
+
+---
+
+## 📐 Análisis estadístico
+
+### Correlación (Pearson)
+
+Se calcula el **coeficiente de correlación de Pearson** entre:
+
+* Variable dependiente: `% de pacientes fuera del TMRG`
+* Variable independiente: `cirugías programadas`
+
+Resultado general:
+
+* La correlación es **débil o no significativa**.
+* En algunos años, más cirugías se asocian incluso con mayores retrasos.
+
+---
+
+## 🧠 Principales conclusiones
+
+* Un mayor número de cirugías **no garantiza** una reducción de los tiempos de espera.
+* La demanda sanitaria crece de forma paralela (envejecimiento poblacional, mayor indicación médica).
+* Existe **alta variabilidad entre hospitales**: el desempeño individual es más determinante que el año o el volumen quirúrgico.
+* El promedio nacional de pacientes fuera del tiempo máximo garantizado es **≈ 23,7%**.
+
+---
+
+## ⚠️ Principales desafíos
+
+* Diseño del **ERD** a partir de dataframes no relacionales.
+* Importación y limpieza de grandes volúmenes de datos en MySQL.
+* Evitar el sesgo de datos acumulados anuales mediante filtrado mensual.
+
+---
+
+## 👩‍💻👨‍💻 Autores
+
+* **Borja Rubio**
+* **Claudia Palladino**
+
+---
+
+## 🛠️ Tecnologías utilizadas
+
+* MySQL
+* SQL (DDL, DML, Views, Aggregations)
+* API SNS Portugal
+* Análisis exploratorio de datos (EDA)
+
+---
